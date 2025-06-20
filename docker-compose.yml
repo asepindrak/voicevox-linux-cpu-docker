@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  voicevox:
+    image: voicevox/voicevox_engine:cpu-ubuntu20.04-latest
+    container_name: voicevox_engine
+    ports:
+      - "50021:50021"
+    restart: unless-stopped
+
+  api:
+    build: .
+    container_name: voicevox_api
+    ports:
+      - "50022:8000"
+    depends_on:
+      - voicevox
+    restart: unless-stopped
+
