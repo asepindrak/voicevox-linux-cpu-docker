@@ -16,13 +16,13 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 class SpeakRequest(BaseModel):
     text: str
-    speaker: int = 14
+    speaker: int = 1
     speed: float = 1.0
     pitch: float = 1.0
 
 @app.post("/speak")
 async def speak(request: Request, req: SpeakRequest):
-    text = req.text[:200]
+    text = req.text[:200]  # batasi panjang maksimal
 
     async with httpx.AsyncClient() as client:
         # Step 1: audio_query
@@ -45,28 +45,29 @@ async def speak(request: Request, req: SpeakRequest):
         )
         synth_resp.raise_for_status()
 
-        # Save WAV & Convert
+        # Save WAV
         uid = uuid.uuid4().hex
         wav_path = os.path.join(STATIC_DIR, f"{uid}.wav")
-        mp4_path = os.path.join(STATIC_DIR, f"{uid}.mp4")
+        mp3_path = os.path.join(STATIC_DIR, f"{uid}.mp3")
+
         with open(wav_path, "wb") as f:
             f.write(synth_resp.content)
 
+        # Convert to MP3
         subprocess.run([
             "ffmpeg",
             "-y",
             "-i", wav_path,
-            "-c:a", "aac",
-            "-b:a", "192k",
-            "-movflags", "+faststart",
-            mp4_path
-        ], check=True)
+            "-codec:a", "libmp3lame",
+            "-qscale:a", "2"
+        , mp3_path], check=True)
 
+        # Hapus WAV setelah konversi
         os.remove(wav_path)
 
-        # Get full URL
+        # Buat URL
         host = request.headers.get("host")
         scheme = request.url.scheme
-        full_url = f"{scheme}://{host}/static/{uid}.mp4"
+        url = f"{scheme}://{host}/static/{uid}.mp3"
 
-        return PlainTextResponse(content=full_url)
+        return PlainTextResponse(content=url)
