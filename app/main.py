@@ -1,17 +1,22 @@
-from fastapi import FastAPI, Query, Response
+from fastapi import FastAPI, Response
+from pydantic import BaseModel
 import httpx
 
 app = FastAPI()
 
 VOICEVOX_URL = "http://voicevox:50021"
 
-@app.get("/speak")
-async def speak(text: str = Query(...), speaker: int = Query(1)):
+class SpeakRequest(BaseModel):
+    text: str
+    speaker: int = 1  # default speaker
+
+@app.post("/speak")
+async def speak(request: SpeakRequest):
     async with httpx.AsyncClient() as client:
         # Step 1: audio_query
         query_resp = await client.post(
             f"{VOICEVOX_URL}/audio_query",
-            params={"text": text, "speaker": speaker},
+            params={"text": request.text, "speaker": request.speaker},
             headers={"accept": "application/json"}
         )
         query_resp.raise_for_status()
@@ -20,7 +25,7 @@ async def speak(text: str = Query(...), speaker: int = Query(1)):
         # Step 2: synthesis
         synth_resp = await client.post(
             f"{VOICEVOX_URL}/synthesis",
-            params={"speaker": speaker},
+            params={"speaker": request.speaker},
             headers={"accept": "audio/wav", "Content-Type": "application/json"},
             json=query_data
         )
